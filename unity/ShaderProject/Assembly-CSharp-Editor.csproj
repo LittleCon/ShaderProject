@@ -56,7 +56,11 @@
     <Analyzer Include="/Applications/Visual Studio.app/Contents/MonoBundle/Addins/MonoDevelop.Unity/Analyzers/Microsoft.Unity.Analyzers.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets/TutorialInfo/Scripts/Editor/ReadmeEditor.cs" />
+    <Compile Include="Assets/URP/TutorialInfo/Scripts/Editor/ReadmeEditor.cs" />
+    <Compile Include="Assets/Editor/Tools/CreateURPShader.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Assets/Editor/Tools/URPShaderTemp.shader" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
