@@ -67,10 +67,23 @@ Shader "Wave/GerstnerWave"
                 return vertex;
             }
 
+            
+
             v2f vert (appdata v)
             {
                 v2f o;
                 v.vertex = GerstnerWave(v.vertex);
+
+                //纠正法线
+                float2 direction = normalize(_Direction.xy);
+                 float t = 2 * PI / _WaveLength;
+                float waveVector = dot(v.vertex.xz,t*direction);
+                float value =  ( waveVector )- _WaveSpeed * _Time.y ;
+
+                float3 tangent = float3(1-_Steepness*_Direction.x*_Direction.x*sin(value),_Steepness*_Direction.x*cos(value),-_Steepness*_Direction.x*_Direction.y*sin(value));
+                float3 binormal = float3(-_Steepness*_Direction.x*_Direction.y*sin(value),_Steepness*_Direction.y*cos(value),1-_Steepness*_Direction.y*_Direction.y*sin(value));
+                v.normal = normalize(cross(tangent,binormal));
+
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
                 o.normalWS = TransformObjectToWorldNormal(v.normal);

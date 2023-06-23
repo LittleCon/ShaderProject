@@ -28,12 +28,14 @@ Shader "Wave/SinWave"
             {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
+                float3 normal:NORMAL;
             };
 
             struct v2f
             {
                 float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
+                float3 normal:TEXCOORD1;
             };
 
             TEXTURE2D(_MainTex); SAMPLER(sampler_MainTex);
@@ -46,20 +48,33 @@ Shader "Wave/SinWave"
             CBUFFER_END
 
             //原理依据正弦波函数 y=Asin(wx+t)
-            float SinWave(float x)
+            float SinWave(float x,float t)
             {
-                 float t = 2 * PI / _WaveLength;
                  float value = t*(x-_WaveSpeed*_Time.y);
                  float waveOffset = _Amplitude * sin(value);
                  return waveOffset;
             }
 
+            float3 GetTangent(float x,float t)
+            {
+                float value =t*(x-_WaveSpeed*_Time.y);
+                float tangentY = _Amplitude*t*cos(value);
+                return float3 (1,tangentY,0);
+            }
+
             v2f vert (appdata v)
             {
                 v2f o;
-                v.vertex.y += SinWave(v.vertex.x);
-                v.vertex.y+=SinWave(v.vertex.z);
+                float t = 2 * PI / _WaveLength;
+
+                v.vertex.y += SinWave(v.vertex.x,t);
+                v.vertex.y+=SinWave(v.vertex.z,t);
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
+                float3 tangent = normalize(GetTangent(v.vertex.x,t));
+                float3 bitangent = (0,0,1);
+                float3 normal = normalize(cross(bitangent,tangent));
+                v.normal = normal;
+                o.normal=normal;
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
                 return o;
             }
@@ -67,8 +82,7 @@ Shader "Wave/SinWave"
             float4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-                float4 col = SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex, i.uv);
-                return col;
+                return float4(i.normal,1);
             }
             ENDHLSL
         }
