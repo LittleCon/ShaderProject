@@ -2,11 +2,11 @@ Shader "Wave/GerstnerWave"
 {
     Properties
     {
+        _Color ("Color", Color) = (1,1,1,1)
         _MainTex ("Texture", 2D) = "white" {}
-        _WaveLength("波浪长度",float)=1
+        _WaveA("波浪A参数([x,y]-波浪方向,z-波浪高度，w-波浪长度)",Vector)=(1,1,1,1)
+        _WaveB("波浪B参数([x,y]-波浪方向,z-波浪高度，w-波浪长度)",Vector)=(1,1,1,1)
         _WaveSpeed("波浪速度",float)=1
-        _Steepness("波浪高度",Range(0,1))=0.1
-        _Direction("波浪方向",Vector)=(0,0,0,0)
         _SpecularColor("高光颜色",Color)=(1,1,1,1)
         _Smoothness("光滑度",Range(0,1))=1
     }
@@ -46,44 +46,45 @@ Shader "Wave/GerstnerWave"
 
             CBUFFER_START(UnityPerMaterial)
             float4 _MainTex_ST;
-            float _Steepness;
-            float _WaveLength;
+            float4 _WaveA;
+            float4 _WaveB;
             float _WaveSpeed;
-            float4 _Direction;
             float4 _SpecularColor;
+            float4 _Color;
             float _Smoothness;
             CBUFFER_END
 
-            float4 GerstnerWave(float4 vertex)
+            float3 GerstnerWave(float4 wave,float3 vertex,inout float3 tangent,inout float3 binormal)
             {
-                float t = 2 * PI / _WaveLength;
-                float a = _Steepness/t;
-                float2 direction = normalize(_Direction.xy);
-                float waveVector = dot(vertex.xz,t*direction);
-                float value =  ( waveVector )- _WaveSpeed * _Time.y ;
-                vertex.x+= a * cos(value)*direction.x;
-                vertex.y = a * sin(value);
-                vertex.z+=a*cos(value)*direction.y;
-                return vertex;
-            }
+                float stepness=wave.z;
+                float wavelength=wave.w;
+                float k = 2 * PI / wavelength;
+                float2 dir = normalize(wave.xy);
+                float f = k * (dot (dir,vertex.xz)- _WaveSpeed * _Time.y);
+                float a = stepness/k;
 
+                
+                tangent += float3(-dir.x*dir.x*stepness*sin(f),dir.x*stepness*cos(f),-dir.x*dir.y*stepness*sin(f));
+                binormal += float3 (-dir.x*dir.y*stepness*sin(f),dir.x*stepness*cos(f),-dir.y*dir.y*stepness*sin(f));
+
+                return float3( dir.x * a * cos(f), a * sin(f),dir.y * (a * cos(f)));
             
+            }
 
             v2f vert (appdata v)
             {
                 v2f o;
-                v.vertex = GerstnerWave(v.vertex);
-
-                //纠正法线
-                float2 direction = normalize(_Direction.xy);
-                 float t = 2 * PI / _WaveLength;
-                float waveVector = dot(v.vertex.xz,t*direction);
-                float value =  ( waveVector )- _WaveSpeed * _Time.y ;
-
-                float3 tangent = float3(1-_Steepness*_Direction.x*_Direction.x*sin(value),_Steepness*_Direction.x*cos(value),-_Steepness*_Direction.x*_Direction.y*sin(value));
-                float3 binormal = float3(-_Steepness*_Direction.x*_Direction.y*sin(value),_Steepness*_Direction.y*cos(value),1-_Steepness*_Direction.y*_Direction.y*sin(value));
-                v.normal = normalize(cross(tangent,binormal));
-
+                float3 tangent = 0;
+                float3 binormal = 0;
+                float3 vertex = v.vertex.xyz;
+                vertex += GerstnerWave(_WaveA,v.vertex.xyz,tangent,binormal);
+                vertex += GerstnerWave(_WaveB,v.vertex.xyz,tangent,binormal);
+                tangent.x=1-saturate(tangent.x);
+                binormal.z=1-saturate(binormal.z);
+                v.vertex.xyz=vertex;
+                v.normal = normalize(cross(binormal,tangent));
+                
+                //v.normal.y = 1 - v.normal.y; 
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
                 o.normalWS = TransformObjectToWorldNormal(v.normal);
@@ -94,7 +95,7 @@ Shader "Wave/GerstnerWave"
             float4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-                float4 col = SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex, i.uv);
+                float4 col = SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex, i.uv)*_Color;
                 float3 normalWS = normalize(i.normalWS);
                 float3 viewDireWS = normalize(_WorldSpaceCameraPos-i.vertexWS);
 
@@ -105,6 +106,7 @@ Shader "Wave/GerstnerWave"
                 col.xyz*=lambert;
 
                 return col;
+                return float4(normalWS,1);
             }
             ENDHLSL
         }
